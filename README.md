@@ -1,6 +1,7 @@
 qsqla
 ===============================
 
+[![Build Status](https://travis-ci.org/blue-yonder/qsqla.svg?branch=master)](https://travis-ci.org/blue-yonder/qsqla)
 
 qSQLA is a query builder for SQLAlchemy Core Selectables 
 

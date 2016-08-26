@@ -1,7 +1,4 @@
 """
-
-.. _qSQLA:
-
 qSQLA Query Syntax
 ==================
 

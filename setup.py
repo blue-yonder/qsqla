@@ -37,6 +37,5 @@ setup(
     setup_requires=['setuptools_scm'] + sphinx,
     author='Peter Hoffmann',
     install_requires=install_requires,
-    zip_save=False,
     author_email='peter.hoffmann@blue-yonder.com'
 )

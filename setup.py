@@ -22,8 +22,8 @@ setup(
     name='qsqla',
     description='qSQLA is a query builder for SQLAlchemy Core Selectables ',
     long_description=long_description,
-    url='https://github.com/hoffmann/qsqla',
-    download_url='https://github.com/hoffmann/qsqla/tarball/',
+    url='https://github.com/blue-yonder/qsqla',
+    download_url='https://github.com/blue-yonder/qsqla/tarball/',
     license='BSD',
     classifiers=[
       'Development Status :: 3 - Alpha',

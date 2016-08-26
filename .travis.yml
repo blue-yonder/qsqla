@@ -1,10 +1,14 @@
 language: python
 python:
-#  - "2.6"
-  - "2.7"
-#  - "3.5"
-#  - "nightly" # currently points to 3.6-dev
-# command to install dependencies
-install: "pip install -r requirements.txt"
-# command to run tests
+- '2.7'
+install: pip install -r requirements.txt
 script: nosetests tests
+deploy:
+  provider: pypi
+  user: peterhoffmann
+  password:
+    secure: WONRnc+xXpM/sxDMpc+mB9QGlEkyG8l9yCWBB1cPmVs0okPPEjjzDWkLdSw3bcVL04Qvu4ya+ElnPq0YSwG3R5Yv6qoS7qiSPB5ioke6vrPLnzlWoQHRZzvzilR+4AniWT40fiNl09SyAXG6TX0R4aYoIW4T6dOB7IwcAMBi7hKwZBJdvtAQraKTVJ5yUyW20wTrugmYtDrR3lIMxet+i0mGccM7R/N7Hm3JHMPh1wfyz+MalSb/32wjfgwZru2RQp8IGQE5ITe9iN8sZ0DAZrtNHi9FhAEMJM0cRh2XPF0ID5eCDa6meX5fnxbdtRqFL/0WKS+FhlPzZq/zhXcUZZKAGxReMuqMYksPfQwDOcL+ED+FPlOl6BMmPaBT8LgrXB4mFIWx4Rq7ZCue/QQMklLHsNqMK49yBLQVpK9JaU95avyCj2kb/m8PHc4Y7IL329rdQAkAF5/NBaTvP3tnCRyH4++sC0WP3kFkP/eJVlSicI4e578Pn2/DRap2SwbGxAOxXzKXBczkM9uLzSqZaumeM2RdHHOZghbsDwhCY9j3WaKCu/g9EwbxvwK1tcj9CA+qt1vlDnmiCTVw3Oopx8ktdqOZiW0T79rITV0LT63C3Se3d24JOii3+i+txDazM780Ort2yE/ThJT+MZ0UK8lstlAqH4SfN5rKEJrXJlA=
+  on:
+    tags: true
+    distributions: sdist bdist_wheel
+    repo: blue-yonder/qsqla

@@ -1,7 +1,7 @@
 # Dev/Deployment
 sphinx
 sphinx_rtd_theme
-nose
+pytest
 coverage
 pypi-publisher
 python-dateutil

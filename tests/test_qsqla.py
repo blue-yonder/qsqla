@@ -4,6 +4,8 @@ import unittest
 from sqlalchemy import (MetaData, Table, Column, DateTime, Integer, String,
                         ForeignKey, create_engine, select)
 
+from operator import itemgetter
+
 import qsqla.query as qsqla
 
 
@@ -50,7 +52,8 @@ class TestSqlaFilter(unittest.TestCase):
         expected = [{"name": "surname", "op": "like", "val": "%joe%"},
                     {"name": "age", "op": "eq", "val": 55}]
 
-        self.assertEquals(filters, expected)
+        self.assertEquals(sorted(filters, key=itemgetter("name")), 
+                          sorted(expected, key=itemgetter("name")))
 
 
 class DBTestCase(unittest.TestCase):

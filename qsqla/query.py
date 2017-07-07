@@ -78,7 +78,8 @@ def requires_types(*types):
     def dec(f):
         @functools.wraps(f)
         def wrapper(arg1, arg2=None):
-            if not any([isinstance(arg1.type, t) for t in types]):
+            arg_basetype = getattr(arg1.type, 'impl', arg1.type)
+            if not any([isinstance(arg_basetype, t) for t in types]):
                 raise TypeError("Cannot apply filter to field {}".format(arg1.name))
             return f(arg1, arg2)
         return wrapper

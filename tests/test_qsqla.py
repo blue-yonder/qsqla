@@ -1,8 +1,8 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 import unittest
 
 from sqlalchemy import (MetaData, Table, Column, DateTime, Integer, String,
-                        ForeignKey, create_engine, select)
+                        ForeignKey, create_engine, types, select)
 
 from operator import itemgetter
 
@@ -56,6 +56,10 @@ class TestSqlaFilter(unittest.TestCase):
                           sorted(expected, key=itemgetter("name")))
 
 
+class CustomDateTime(types.TypeDecorator):
+    impl = DateTime
+
+
 class DBTestCase(unittest.TestCase):
     def setUp(self):
         self.db = create_engine("sqlite://")
@@ -71,7 +75,7 @@ class DBTestCase(unittest.TestCase):
         self.location = Table('location', self.md,
                               Column('l_id', Integer, primary_key=True),
                               Column('l_name', String(16), nullable=False),
-                              Column('l_date', DateTime)
+                              Column('l_date', CustomDateTime)
                               )
         self.md.create_all()
 
@@ -225,3 +229,7 @@ class TestOperators(DBTestCase):
         self.perform_assertion({"name": "u_id", "op": "not_in", "val": "1,3"},
                           ['Oli'])
 
+    def test_operation_on_typedecorated_type(self):
+        val = datetime.now() - timedelta(hours=5)
+        self.perform_assertion({"name": "l_date", "op": "ne", "val": val},
+                               ['Micha', 'Oli', 'Tom'])

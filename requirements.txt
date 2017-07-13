@@ -6,3 +6,4 @@ coverage
 pypi-publisher
 python-dateutil
 sqlalchemy
+psycopg2

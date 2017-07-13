@@ -65,7 +65,7 @@ class DBTestCase(unittest.TestCase):
         self.db = create_engine("sqlite://")
 
         self.md = MetaData(self.db)
-        self.user = Table('user', self.md,
+        self.user = Table('user_table', self.md,
                           Column('u_id', Integer, primary_key=True),
                           Column('u_name', String(16), nullable=False),
                           Column('u_l_id', Integer,
@@ -78,18 +78,21 @@ class DBTestCase(unittest.TestCase):
                               Column('l_date', CustomDateTime)
                               )
         self.md.create_all()
-
         self.db.execute(
             "insert into location values(1, 'Karlsruhe', '{}')".format(
                 datetime.now()))
         self.db.execute(
             "insert into location values(2, 'Stuttgart', '{}')".format(
                 datetime.now()))
-        self.db.execute("insert into user values(1, 'Micha', 1)")
-        self.db.execute("insert into user values(2, 'Oli', 1)")
-        self.db.execute("insert into user values(3, 'Tom', 2)")
+        self.db.execute("insert into user_table values(1, 'Micha', 1)")
+        self.db.execute("insert into user_table values(2, 'Oli', 1)")
+        self.db.execute("insert into user_table values(3, 'Tom', 2)")
         self.joined_select = self.location.join(
             self.user, self.location.c.l_id == self.user.c.u_l_id).select()
+
+    def tearDown(self):
+        self.user.drop()
+        self.location.drop()
 
 
 class TestSqlaQuery(DBTestCase):
@@ -228,11 +231,11 @@ class TestOperators(DBTestCase):
 
     def test_ilike(self):
         self.perform_assertion(
-            {"name": "l_name", "op": "like", "val": "%gaRT%"},
+            {"name": "l_name", "op": "ilike", "val": "%gaRT%"},
             ['Tom'])
 
     def test_not_ilike(self):
-        self.perform_assertion({"name": "l_name", "op": "not_like", "val": "%gaRT%"},
+        self.perform_assertion({"name": "l_name", "op": "not_ilike", "val": "%gaRT%"},
                           ['Micha', 'Oli'])
 
     def test_in_(self):

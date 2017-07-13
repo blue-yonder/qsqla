@@ -1,3 +1,8 @@
+Next Release
+============
+
+- Added support for custom types which use sqlalchemy.types.TypeDecorator.
+
 0.1.0
 =====
 

@@ -2,6 +2,7 @@ Next Release
 ============
 
 - Added support for custom types which use sqlalchemy.types.TypeDecorator.
+- Added support for ilike and not_ilike filter
 
 0.1.0
 =====

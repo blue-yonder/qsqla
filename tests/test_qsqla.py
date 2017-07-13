@@ -1,12 +1,15 @@
-from datetime import date, datetime, timedelta
 import unittest
+import os
 
+from datetime import date, datetime, timedelta
+from operator import itemgetter
 from sqlalchemy import (MetaData, Table, Column, DateTime, Integer, String,
                         ForeignKey, create_engine, types, select)
 
-from operator import itemgetter
 
 import qsqla.query as qsqla
+
+
 
 
 class TestSqlaSplitOperator(unittest.TestCase):
@@ -62,10 +65,11 @@ class CustomDateTime(types.TypeDecorator):
 
 class DBTestCase(unittest.TestCase):
     def setUp(self):
-        self.db = create_engine("sqlite://")
+        dsn = os.environ.get("ENV_DSN", "sqlite://")
+        self.db = create_engine(dsn)
 
         self.md = MetaData(self.db)
-        self.user = Table('user', self.md,
+        self.user = Table('user_table', self.md,
                           Column('u_id', Integer, primary_key=True),
                           Column('u_name', String(16), nullable=False),
                           Column('u_l_id', Integer,
@@ -78,18 +82,21 @@ class DBTestCase(unittest.TestCase):
                               Column('l_date', CustomDateTime)
                               )
         self.md.create_all()
-
         self.db.execute(
             "insert into location values(1, 'Karlsruhe', '{}')".format(
                 datetime.now()))
         self.db.execute(
             "insert into location values(2, 'Stuttgart', '{}')".format(
                 datetime.now()))
-        self.db.execute("insert into user values(1, 'Micha', 1)")
-        self.db.execute("insert into user values(2, 'Oli', 1)")
-        self.db.execute("insert into user values(3, 'Tom', 2)")
+        self.db.execute("insert into user_table values(1, 'Micha', 1)")
+        self.db.execute("insert into user_table values(2, 'Oli', 1)")
+        self.db.execute("insert into user_table values(3, 'Tom', 2)")
         self.joined_select = self.location.join(
             self.user, self.location.c.l_id == self.user.c.u_l_id).select()
+
+    def tearDown(self):
+        self.user.drop()
+        self.location.drop()
 
 
 class TestSqlaQuery(DBTestCase):
@@ -217,8 +224,22 @@ class TestOperators(DBTestCase):
         self.perform_assertion({"name": "l_name", "op": "like", "val": "%gart%"},
                           ['Tom'])
 
+    def test_like_is_case_sensitive(self):
+        self.perform_assertion(
+            {"name": "l_name", "op": "like", "val": "%gaRT%"},
+            [])
+
     def test_not_like(self):
         self.perform_assertion({"name": "l_name", "op": "not_like", "val": "%gart%"},
+                          ['Micha', 'Oli'])
+
+    def test_ilike(self):
+        self.perform_assertion(
+            {"name": "l_name", "op": "ilike", "val": "%gaRT%"},
+            ['Tom'])
+
+    def test_not_ilike(self):
+        self.perform_assertion({"name": "l_name", "op": "not_ilike", "val": "%gaRT%"},
                           ['Micha', 'Oli'])
 
     def test_in_(self):

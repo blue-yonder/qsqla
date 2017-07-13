@@ -45,12 +45,12 @@ Binary operators:
 - ``lt`` for Integer, Date and DateTime fields
 - ``gte`` for Integer, Date and DateTime fields
 - ``lte`` for Integer, Date and DateTime fields
-- ``like`` for String fields
-- ``not_like`` for String fields
+- ``like`` for String fields. Case-insensitivity is dependant on the database implementation of LIKE.
+- ``not_like`` for String fields. Case-insensitivity is dependant on the database implementation of NOT LIKE.
+- ``ilike`` always case-insensitive like for String fields
+- ``not_ilike`` always case-insensitive not like for String fields
 - ``in`` for Integer, String fields. The values are provided as a comma separated list.
 - ``not_in`` for Integer, String fields. The values are provided as a comma separated list.
-
-
 
 Supported Types:
 
@@ -169,7 +169,6 @@ def less_than_equals(arg1, arg2):
     return arg1 <= arg2
 
 
-
 @requires_types(types.String)
 @convert_generic
 def like(arg1, arg2):
@@ -180,6 +179,18 @@ def like(arg1, arg2):
 @convert_generic
 def not_like(arg1, arg2):
     return ~arg1.like(arg2)
+
+
+@requires_types(types.String)
+@convert_generic
+def ilike(arg1, arg2):
+    return arg1.ilike(arg2)
+
+
+@requires_types(types.String)
+@convert_generic
+def not_ilike(arg1, arg2):
+    return ~arg1.ilike(arg2)
 
 
 @requires_types(types.Integer, types.String)
@@ -213,10 +224,11 @@ OPERATORS = {
     'lte': less_than_equals,
     'like': like,
     'not_like': not_like,
+    'ilike': ilike,
+    'not_ilike': not_ilike,
     'in': in_,
     'not_in': not_in,
 }
-
 
 
 def split_operator(param):
@@ -296,7 +308,3 @@ def query(selectable, filters, limit=None, offset=None, order=None, asc=True):
             order_col = order_col.desc()
         sel = sel.order_by(order_col)
     return sel
-
-
-
-

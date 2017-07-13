@@ -1,12 +1,15 @@
-from datetime import date, datetime, timedelta
 import unittest
+import os
 
+from datetime import date, datetime, timedelta
+from operator import itemgetter
 from sqlalchemy import (MetaData, Table, Column, DateTime, Integer, String,
                         ForeignKey, create_engine, types, select)
 
-from operator import itemgetter
 
 import qsqla.query as qsqla
+
+
 
 
 class TestSqlaSplitOperator(unittest.TestCase):
@@ -62,7 +65,8 @@ class CustomDateTime(types.TypeDecorator):
 
 class DBTestCase(unittest.TestCase):
     def setUp(self):
-        self.db = create_engine("sqlite://")
+        dsn = os.environ.get("ENV_DSN", "sqlite://")
+        self.db = create_engine(dsn)
 
         self.md = MetaData(self.db)
         self.user = Table('user_table', self.md,

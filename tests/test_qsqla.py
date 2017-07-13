@@ -217,8 +217,22 @@ class TestOperators(DBTestCase):
         self.perform_assertion({"name": "l_name", "op": "like", "val": "%gart%"},
                           ['Tom'])
 
+    def test_like_is_case_sensitive(self):
+        self.perform_assertion(
+            {"name": "l_name", "op": "like", "val": "%gaRT%"},
+            [])
+
     def test_not_like(self):
         self.perform_assertion({"name": "l_name", "op": "not_like", "val": "%gart%"},
+                          ['Micha', 'Oli'])
+
+    def test_ilike(self):
+        self.perform_assertion(
+            {"name": "l_name", "op": "like", "val": "%gaRT%"},
+            ['Tom'])
+
+    def test_not_ilike(self):
+        self.perform_assertion({"name": "l_name", "op": "not_like", "val": "%gaRT%"},
                           ['Micha', 'Oli'])
 
     def test_in_(self):

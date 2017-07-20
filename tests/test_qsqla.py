@@ -252,7 +252,7 @@ class TestOperators(DBTestCase):
                           ['Oli'])
 
     def test_operation_on_typedecorated_type(self):
-        val = datetime.now() - timedelta(hours=5)
+        val = (datetime.now() - timedelta(hours=5)).isoformat()
         self.perform_assertion({"name": "l_date", "op": "ne", "val": val},
                                ['Micha', 'Oli', 'Tom'])
 

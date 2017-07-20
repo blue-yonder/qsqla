@@ -67,6 +67,7 @@ class DBTestCase(unittest.TestCase):
     def setUp(self):
         dsn = os.environ.get("ENV_DSN", "sqlite://")
         self.db = create_engine(dsn)
+        self.now = datetime.now()
 
         self.md = MetaData(self.db)
         self.user = Table('user_table', self.md,
@@ -84,10 +85,10 @@ class DBTestCase(unittest.TestCase):
         self.md.create_all()
         self.db.execute(
             "insert into location values(1, 'Karlsruhe', '{}')".format(
-                datetime.now()))
+                self.now))
         self.db.execute(
             "insert into location values(2, 'Stuttgart', '{}')".format(
-                datetime.now()))
+                self.now))
         self.db.execute("insert into user_table values(1, 'Micha', 1)")
         self.db.execute("insert into user_table values(2, 'Oli', 1)")
         self.db.execute("insert into user_table values(3, 'Tom', 2)")
@@ -251,6 +252,15 @@ class TestOperators(DBTestCase):
                           ['Oli'])
 
     def test_operation_on_typedecorated_type(self):
-        val = datetime.now() - timedelta(hours=5)
+        val = (datetime.now() - timedelta(hours=5)).isoformat()
         self.perform_assertion({"name": "l_date", "op": "ne", "val": val},
                                ['Micha', 'Oli', 'Tom'])
+
+    def test_greater_than_typedecorated_datetime(self):
+        datestring = (self.now - timedelta(minutes=1)).isoformat()
+        self.perform_assertion({"name": "l_date", "op": "gt", "val": datestring},
+                          ['Micha', 'Oli', 'Tom'])
+        datestring = (self.now + timedelta(minutes=1)).isoformat()
+        self.perform_assertion(
+            {"name": "l_date", "op": "gt", "val": datestring},
+            [])

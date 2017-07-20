@@ -88,11 +88,12 @@ def requires_types(*types):
 
 def convert_type(type_, value):
     cls = type_.__class__
-    if issubclass(cls, types.Integer):
+    basetype = getattr(cls, 'impl', cls)
+    if issubclass(basetype, types.Integer):
         return int(value)
-    elif issubclass(cls, types.String):
+    elif issubclass(basetype, types.String):
         return value
-    elif issubclass(cls, types.DateTime):
+    elif issubclass(basetype, types.DateTime):
         return dateutil.parser.parse(value)
 
 

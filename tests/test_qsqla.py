@@ -257,10 +257,10 @@ class TestOperators(DBTestCase):
                                ['Micha', 'Oli', 'Tom'])
 
     def test_greater_than_typedecorated_datetime(self):
-        datestring = (self.now - timedelta(minutes=60)).isoformat()
+        datestring = (self.now - timedelta(minutes=1)).isoformat()
         self.perform_assertion({"name": "l_date", "op": "gt", "val": datestring},
                           ['Micha', 'Oli', 'Tom'])
-        datestring = (self.now + timedelta(minutes=60)).isoformat()
+        datestring = (self.now + timedelta(minutes=1)).isoformat()
         self.perform_assertion(
             {"name": "l_date", "op": "gt", "val": datestring},
             [])

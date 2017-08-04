@@ -5,11 +5,30 @@ from datetime import date, datetime, timedelta
 from operator import itemgetter
 from sqlalchemy import (MetaData, Table, Column, DateTime, Integer, String,
                         ForeignKey, create_engine, types, select)
-
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
 import qsqla.query as qsqla
 
 
+class CustomDateTime(types.TypeDecorator):
+    impl = DateTime
+
+
+Base = declarative_base()
+
+
+class Location(Base):
+    __tablename__ = 'location'
+    l_id = Column(Integer, primary_key=True)
+    l_name = Column(String(16))
+    l_date = Column(CustomDateTime)
+
+class User(Base):
+    __tablename__ = 'user_table'
+    u_id = Column(Integer, primary_key=True)
+    u_name = Column(String(16))
+    u_l_id = Column(ForeignKey(Location.l_id))
 
 
 class TestSqlaSplitOperator(unittest.TestCase):
@@ -59,30 +78,15 @@ class TestSqlaFilter(unittest.TestCase):
                           sorted(expected, key=itemgetter("name")))
 
 
-class CustomDateTime(types.TypeDecorator):
-    impl = DateTime
-
-
 class DBTestCase(unittest.TestCase):
     def setUp(self):
-        dsn = os.environ.get("ENV_DSN", "sqlite://")
+        dsn = os.environ.get("ENV_DSN", "sqlite:///:memory:")
         self.db = create_engine(dsn)
+        self.session = sessionmaker(bind=self.db)()
         self.now = datetime.now()
-
-        self.md = MetaData(self.db)
-        self.user = Table('user_table', self.md,
-                          Column('u_id', Integer, primary_key=True),
-                          Column('u_name', String(16), nullable=False),
-                          Column('u_l_id', Integer,
-                                 ForeignKey("location.l_id"))
-                          )
-
-        self.location = Table('location', self.md,
-                              Column('l_id', Integer, primary_key=True),
-                              Column('l_name', String(16), nullable=False),
-                              Column('l_date', CustomDateTime)
-                              )
-        self.md.create_all()
+        Base.metadata.create_all(self.db)
+        self.user = User.__table__
+        self.location = Location.__table__
         self.db.execute(
             "insert into location values(1, 'Karlsruhe', '{}')".format(
                 self.now))
@@ -96,8 +100,7 @@ class DBTestCase(unittest.TestCase):
             self.user, self.location.c.l_id == self.user.c.u_l_id).select()
 
     def tearDown(self):
-        self.user.drop()
-        self.location.drop()
+        Base.metadata.drop_all(self.db)
 
 
 class TestSqlaQuery(DBTestCase):
@@ -264,3 +267,7 @@ class TestOperators(DBTestCase):
         self.perform_assertion(
             {"name": "l_date", "op": "gt", "val": datestring},
             [])
+
+
+class TestORM(DBTestCase):
+    pass

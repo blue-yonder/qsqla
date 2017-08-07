@@ -104,6 +104,9 @@ class DBTestCase(unittest.TestCase):
 
     def tearDown(self):
         Base.metadata.drop_all(self.db)
+        self.session.commit()
+        self.session.close()
+        self.db.close()
 
 
 class TestSqlaQueryCore(DBTestCase):

@@ -84,8 +84,9 @@ class TestSqlaFilter(unittest.TestCase):
 class DBTestCase(unittest.TestCase):
     def setUp(self):
         dsn = os.environ.get("ENV_DSN", "sqlite:///:memory:")
-        self.db = create_engine(dsn)
-        self.session = sessionmaker(bind=self.db)()
+        self.engine = create_engine(dsn)
+        self.db = self.engine.connect()
+        self.session = sessionmaker()(bind=self.db)
         self.now = datetime.now()
         Base.metadata.create_all(self.db)
         self.user = User.__table__

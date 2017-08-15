@@ -1,6 +1,9 @@
 Next Release
 ============
 
+0.2.0
+=====
+
 - Add SQLAlchemy ORM support
 
 0.1.2

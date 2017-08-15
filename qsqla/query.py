@@ -68,10 +68,11 @@ In addition to the filters one can provide
 - ``_desc`` If provided sort in descending order, else in ascending.
 
 """
-from sqlalchemy import and_, select, func
-from sqlalchemy import types
 import functools
+
 import dateutil.parser
+import sqlalchemy
+from sqlalchemy.sql.selectable import Selectable
 
 
 def requires_types(*types):
@@ -89,11 +90,11 @@ def requires_types(*types):
 def convert_type(type_, value):
     cls = type_.__class__
     basetype = getattr(cls, 'impl', cls)
-    if issubclass(basetype, types.Integer):
+    if issubclass(basetype, sqlalchemy.types.Integer):
         return int(value)
-    elif issubclass(basetype, types.String):
+    elif issubclass(basetype, sqlalchemy.types.String):
         return value
-    elif issubclass(basetype, types.DateTime):
+    elif issubclass(basetype, sqlalchemy.types.DateTime):
         return dateutil.parser.parse(value)
 
 
@@ -119,94 +120,96 @@ def is_not_null(arg1, arg2=None):
     return arg1 != None  # NOQA
 
 
-@requires_types(types.Boolean)
+@requires_types(sqlalchemy.types.Boolean)
 def is_true(arg1, arg2=None):
     return arg1 == True  # NOQA
 
 
-@requires_types(types.Boolean)
+@requires_types(sqlalchemy.types.Boolean)
 def is_false(arg1, arg2=None):
     return arg1 == False  # NOQA
 
 
-@requires_types(types.Integer, types.String, types.DateTime)
+@requires_types(sqlalchemy.types.Integer, sqlalchemy.types.String,
+                sqlalchemy.types.DateTime)
 @convert_generic
 def equals(arg1, arg2):
     return arg1 == arg2
 
 
-@requires_types(types.Integer, types.String, types.DateTime)
+@requires_types(sqlalchemy.types.Integer, sqlalchemy.types.String,
+                sqlalchemy.types.DateTime)
 @convert_generic
 def not_equals(arg1, arg2):
     return arg1 != arg2
 
 
-@requires_types(types.String)
+@requires_types(sqlalchemy.types.String)
 @convert_generic
 def ignore_case_equals(arg1, arg2):
-    return func.lower(arg1) == arg2.lower()
+    return sqlalchemy.func.lower(arg1) == arg2.lower()
 
-@requires_types(types.Integer, types.DateTime)
+@requires_types(sqlalchemy.types.Integer, sqlalchemy.types.DateTime)
 @convert_generic
 def greater_than(arg1, arg2):
     return arg1 > arg2
 
 
-@requires_types(types.Integer, types.DateTime)
+@requires_types(sqlalchemy.types.Integer, sqlalchemy.types.DateTime)
 @convert_generic
 def greater_than_equals(arg1, arg2):
     return arg1 >= arg2
 
 
-@requires_types(types.Integer, types.DateTime)
+@requires_types(sqlalchemy.types.Integer, sqlalchemy.types.DateTime)
 @convert_generic
 def less_than(arg1, arg2):
     return arg1 < arg2
 
 
-@requires_types(types.Integer, types.DateTime)
+@requires_types(sqlalchemy.types.Integer, sqlalchemy.types.DateTime)
 @convert_generic
 def less_than_equals(arg1, arg2):
     return arg1 <= arg2
 
 
-@requires_types(types.String)
+@requires_types(sqlalchemy.types.String)
 @convert_generic
 def like(arg1, arg2):
     return arg1.like(arg2)
 
 
-@requires_types(types.String)
+@requires_types(sqlalchemy.types.String)
 @convert_generic
 def not_like(arg1, arg2):
     return ~arg1.like(arg2)
 
 
-@requires_types(types.String)
+@requires_types(sqlalchemy.types.String)
 @convert_generic
 def ilike(arg1, arg2):
     return arg1.ilike(arg2)
 
 
-@requires_types(types.String)
+@requires_types(sqlalchemy.types.String)
 @convert_generic
 def not_ilike(arg1, arg2):
     return ~arg1.ilike(arg2)
 
 
-@requires_types(types.Integer, types.String)
+@requires_types(sqlalchemy.types.Integer, sqlalchemy.types.String)
 @convert_list
 def in_(arg1, arg2):
     return arg1.in_(arg2)
 
 
-@requires_types(types.Integer, types.String)
+@requires_types(sqlalchemy.types.Integer, sqlalchemy.types.String)
 @convert_list
 def not_in(arg1, arg2):
     return ~arg1.in_(arg2)
 
 
-UNRAY_OPERATORS = ['is_null', 'is_not_null', 'is_true', 'is_false']
+UNARY_OPERATORS = ['is_null', 'is_not_null', 'is_true', 'is_false']
 
 
 OPERATORS = {
@@ -261,21 +264,59 @@ def get_column(s, name):
     raise KeyError("column {} not found".format(name))
 
 
-def query(selectable, filters, limit=None, offset=None, order=None, asc=True):
-    """add filters to an sqlalchemy selactable
+def query(selectable_or_model, filters, limit=None, offset=None, order=None, asc=True):
+    """
+    Main entry point for applying filters and pagination controls.
 
-    :param selectable: the select statements
-    :param filters: a dictionary with filters
-    :param limit: the limit
-    :param offset: the offset
-    :param order: the order field
-    :param asc: boolean if sorting should be ascending
+    :param selectable_or_model: an SQLAlchemy Core Selectable or ORM Model
+    :param filters: a list of filters produced by build_filters
+    :param limit: int. the limit.
+    :param offset: int. the offset.
+    :param order: string. The name of the field to order by.
+    :param asc: bool. Ascending (default) or descending order.
 
     :raises KeyError: if key is not available in query
-    :raises ValueError: if value cannont be converted to Column Type
+    :raises ValueError: if value cannot be converted to Column Type
     :raises TypeError: if filter is not available for SQLAlchemy Column Type
 
-    :return: a selectable with the filters, offset and order applied
+    :return: an SQLAlchemy Core Selectable or ORM Query object.
+    """
+    use_core = isinstance(selectable_or_model, Selectable)
+    func = core_query if use_core else orm_query
+    filtered = func(selectable_or_model, filters)
+
+    if order:
+        if use_core:
+            order_col = get_column(selectable_or_model, order)
+        else:
+            order_col = getattr(selectable_or_model, order)
+        if not asc:
+            order_col = order_col.desc()
+        filtered = filtered.order_by(order_col)
+
+    if limit is None:
+        limit = 10000
+    else:
+        limit = min(int(limit), 10000)
+
+    filtered = filtered.limit(limit)
+    if offset:
+        filtered = filtered.offset(offset)
+
+    return filtered
+
+
+def core_query(selectable, filters):
+    """Add filters to an sqlalchemy selectable
+
+    :param selectable: the select statements
+    :param filters: a list of filters produced by build_filters
+
+    :raises KeyError: if key is not available in query
+    :raises ValueError: if value cannot be converted to Column Type
+    :raises TypeError: if filter is not available for SQLAlchemy Column Type
+
+    :return: a selectable with the filters applied
     """
     restrictions = []
 
@@ -283,29 +324,32 @@ def query(selectable, filters, limit=None, offset=None, order=None, asc=True):
 
     for f in filters:
         col = get_column(alias, f["name"])
-        if f["op"] in UNRAY_OPERATORS:
+        if f["op"] in UNARY_OPERATORS:
             restrictions.append(OPERATORS[f["op"]](col))
         else:
             restrictions.append(OPERATORS[f["op"]](col, f["val"]))
 
     if restrictions:
-        sel = select([alias], whereclause=and_(*restrictions))
+        sel = sqlalchemy.select([alias], whereclause=sqlalchemy.and_(*restrictions))
     else:
-        sel = select([alias])
-
-    if limit is None:
-        limit = 10000
-    else:
-        limit = min(int(limit), 10000)
-
-    sel = sel.limit(limit)
-    if offset:
-        sel = sel.offset(offset)
-    if order:
-        order_col = get_column(alias, order)
-        if order_col is None:
-            order_col = list(alias.columns)[0]
-        if not asc:
-            order_col = order_col.desc()
-        sel = sel.order_by(order_col)
+        sel = sqlalchemy.select([alias])
     return sel
+
+
+def orm_query(model, filters):
+    """ Add filters to an sqlalchemy ORM query
+    :param model: an SQLAlchemy Model
+    :param filters: a list of filters produced by build_filters
+
+    :return: a SQLAlchemy ORM Query with the filters applied
+    """
+    query = sqlalchemy.orm.Query(model)
+    restrictions = []
+    for f in filters:
+        col = getattr(model, f['name'])
+        if f["op"] in UNARY_OPERATORS:
+            restrictions.append(OPERATORS[f["op"]](col))
+        else:
+            restrictions.append(OPERATORS[f["op"]](col, f["val"]))
+    query = query.filter(*restrictions)
+    return query

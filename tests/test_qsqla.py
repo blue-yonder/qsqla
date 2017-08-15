@@ -5,10 +5,32 @@ from datetime import date, datetime, timedelta
 from operator import itemgetter
 from sqlalchemy import (MetaData, Table, Column, DateTime, Integer, String,
                         ForeignKey, create_engine, types, select)
-
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, relationship
 
 import qsqla.query as qsqla
 
+
+class CustomDateTime(types.TypeDecorator):
+    impl = DateTime
+
+
+Base = declarative_base()
+
+
+class Location(Base):
+    __tablename__ = 'location'
+    l_id = Column(Integer, primary_key=True)
+    l_name = Column(String(16))
+    l_date = Column(CustomDateTime)
+
+class User(Base):
+    __tablename__ = 'user_table'
+    u_id = Column(Integer, primary_key=True)
+    u_name = Column(String(16))
+    u_l_id = Column(ForeignKey(Location.l_id))
+    location = relationship(Location)
+    u_date = Column(CustomDateTime)
 
 
 
@@ -59,48 +81,35 @@ class TestSqlaFilter(unittest.TestCase):
                           sorted(expected, key=itemgetter("name")))
 
 
-class CustomDateTime(types.TypeDecorator):
-    impl = DateTime
-
-
 class DBTestCase(unittest.TestCase):
     def setUp(self):
-        dsn = os.environ.get("ENV_DSN", "sqlite://")
-        self.db = create_engine(dsn)
+        dsn = os.environ.get("ENV_DSN", "sqlite:///:memory:")
+        self.engine = create_engine(dsn)
+        self.db = self.engine.connect()
+        self.session = sessionmaker()(bind=self.db)
         self.now = datetime.now()
-
-        self.md = MetaData(self.db)
-        self.user = Table('user_table', self.md,
-                          Column('u_id', Integer, primary_key=True),
-                          Column('u_name', String(16), nullable=False),
-                          Column('u_l_id', Integer,
-                                 ForeignKey("location.l_id"))
-                          )
-
-        self.location = Table('location', self.md,
-                              Column('l_id', Integer, primary_key=True),
-                              Column('l_name', String(16), nullable=False),
-                              Column('l_date', CustomDateTime)
-                              )
-        self.md.create_all()
-        self.db.execute(
-            "insert into location values(1, 'Karlsruhe', '{}')".format(
-                self.now))
-        self.db.execute(
-            "insert into location values(2, 'Stuttgart', '{}')".format(
-                self.now))
-        self.db.execute("insert into user_table values(1, 'Micha', 1)")
-        self.db.execute("insert into user_table values(2, 'Oli', 1)")
-        self.db.execute("insert into user_table values(3, 'Tom', 2)")
+        Base.metadata.create_all(self.db)
+        self.user = User.__table__
+        self.location = Location.__table__
+        l1 = Location(l_name='Karlsruhe', l_date=self.now)
+        l2 = Location(l_name='Stuttgart', l_date=self.now)
+        self.session.add(l1)
+        self.session.add(l2)
+        self.session.add(User(u_name='Micha', location=l1, u_date=self.now))
+        self.session.add(User(u_name='Oli', location=l1, u_date=self.now))
+        self.session.add(User(u_name='Tom', location=l2, u_date=self.now))
+        self.session.commit()
         self.joined_select = self.location.join(
             self.user, self.location.c.l_id == self.user.c.u_l_id).select()
 
     def tearDown(self):
-        self.user.drop()
-        self.location.drop()
+        Base.metadata.drop_all(self.db)
+        self.session.commit()
+        self.session.close()
+        self.db.close()
 
 
-class TestSqlaQuery(DBTestCase):
+class TestSqlaQueryCore(DBTestCase):
     def assertEqualColumns(self, first, second):
         first_columns = set(c.name for c in first.columns)
         second_columns = set(c.name for c in second.columns)
@@ -124,58 +133,86 @@ class TestSqlaQuery(DBTestCase):
         self.assertEqualColumns(self.joined_select, result)
 
     def test_limit(self):
-        query = qsqla.query(self.user.select(),
-                            [],
-                            limit=2)
+        limit = 2
+        query = qsqla.query(self.user.select(), [], limit=limit)
         rows = self.db.execute(query)
+        self.assertEquals(len(list(rows)), limit)
 
+    def test_offset(self):
+        query = qsqla.query(self.user.select(), [], offset=2)
+        rows = self.db.execute(query)
+        self.assertEquals(len(list(rows)), 1)
+
+    def test_order_with_default_ascending(self):
+        query = qsqla.query(self.user.select(), [], order="u_id")
+        rows = self.db.execute(query)
+        self.assertEquals([row.u_id for row in rows], [1, 2, 3])
+
+    def test_order_with_forced_ascending(self):
+        query = qsqla.query(self.user.select(), [], order="u_id", asc=True)
+        rows = self.db.execute(query)
+        self.assertEquals([row.u_id for row in rows], [1, 2, 3])
+
+    def test_order_with_forced_descending(self):
+        query = qsqla.query(self.user.select(), [], order="u_id", asc=False)
+        rows = self.db.execute(query)
+        self.assertEquals([row.u_id for row in rows], [3, 2, 1])
+
+
+class TestSqlaQueryORM(DBTestCase):
+
+    def test_limit(self):
+        query = qsqla.query(User, [], limit=2)
+        query.session = self.session
+        rows = query.all()
         self.assertEquals(len(list(rows)), 2)
 
     def test_offset(self):
-        query = qsqla.query(self.user.select(),
-                            [],
-                            offset=2)
-        rows = self.db.execute(query)
-
-        remaining_rows = 3 - 2
-        self.assertEquals(len(list(rows)), remaining_rows)
+        query = qsqla.query(User, [], offset=2)
+        query.session = self.session
+        rows = query.all()
+        self.assertEquals(len(list(rows)), 1)
 
     def test_order_with_default_ascending(self):
-        query = qsqla.query(self.user.select(),
-                            [],
-                            order="u_id")
-        rows = self.db.execute(query)
+        query = qsqla.query(User, [], order="u_id")
+        query.session = self.session
+        rows = query.all()
         self.assertEquals([row.u_id for row in rows], [1, 2, 3])
 
     def test_order_with_forced_ascending(self):
-        query = qsqla.query(self.user.select(),
-                            [],
-                            order="u_id",
-                            asc=True)
-        rows = self.db.execute(query)
+        query = qsqla.query(User, [], order="u_id", asc=True)
+        query.session = self.session
+        rows = query.all()
         self.assertEquals([row.u_id for row in rows], [1, 2, 3])
 
-    def test_order_with_forced_ascending(self):
-        query = qsqla.query(self.user.select(),
-                            [],
-                            order="u_id",
-                            asc=False)
+    def test_order_with_forced_descending(self):
+        query = qsqla.query(self.user.select(), [], order="u_id", asc=False)
         rows = self.db.execute(query)
         self.assertEquals([row.u_id for row in rows], [3, 2, 1])
 
 
 class TestOperators(DBTestCase):
     def perform_assertion(self, filter, expected_names):
+        # test core
         selectable = qsqla.query(self.joined_select, [filter])
         rows = self.db.execute(selectable)
         self.assertEqual([dict(r)['u_name'] for r in rows], expected_names)
 
+        if filter['name'].startswith('u_'):
+            # test ORM
+            q = qsqla.query(User, [filter])
+            q.session = self.session
+            self.assertEqual([row.u_name for row in q.all()], expected_names)
+
     def test_is_null(self):
         self.perform_assertion({"name": "l_id", "op": "is_null"}, [])
+        self.perform_assertion({"name": "u_id", "op": "is_null"}, [])
 
     def test_is_not_null(self):
         self.perform_assertion({"name": "l_id", "op": "is_not_null"},
                           ['Micha', 'Oli', 'Tom'])
+        self.perform_assertion({"name": "u_id", "op": "is_not_null"},
+                               ['Micha', 'Oli', 'Tom'])
 
     def test_equals(self):
         self.perform_assertion({"name": "l_id", "op": "eq", "val": "1"},
@@ -224,24 +261,38 @@ class TestOperators(DBTestCase):
     def test_like(self):
         self.perform_assertion({"name": "l_name", "op": "like", "val": "%gart%"},
                           ['Tom'])
+        self.perform_assertion({"name": "u_name", "op": "like", "val": "%om%"},
+            ['Tom'])
 
     def test_like_is_case_sensitive(self):
         self.perform_assertion(
             {"name": "l_name", "op": "like", "val": "%gaRT%"},
             [])
+        self.perform_assertion(
+            {"name": "u_name", "op": "like", "val": "%OM%"},
+            [])
 
     def test_not_like(self):
         self.perform_assertion({"name": "l_name", "op": "not_like", "val": "%gart%"},
                           ['Micha', 'Oli'])
+        self.perform_assertion(
+            {"name": "u_name", "op": "not_like", "val": "%om%"},
+            ['Micha', 'Oli'])
 
     def test_ilike(self):
         self.perform_assertion(
             {"name": "l_name", "op": "ilike", "val": "%gaRT%"},
             ['Tom'])
+        self.perform_assertion(
+            {"name": "u_name", "op": "ilike", "val": "%oM%"},
+            ['Tom'])
 
     def test_not_ilike(self):
         self.perform_assertion({"name": "l_name", "op": "not_ilike", "val": "%gaRT%"},
                           ['Micha', 'Oli'])
+        self.perform_assertion(
+            {"name": "u_name", "op": "not_ilike", "val": "%oM%"},
+            ['Micha', 'Oli'])
 
     def test_in_(self):
         self.perform_assertion({"name": "u_id", "op": "in", "val": "1,3"},
@@ -253,12 +304,12 @@ class TestOperators(DBTestCase):
 
     def test_operation_on_typedecorated_type(self):
         val = (datetime.now() - timedelta(hours=5)).isoformat()
-        self.perform_assertion({"name": "l_date", "op": "ne", "val": val},
+        self.perform_assertion({"name": "u_date", "op": "ne", "val": val},
                                ['Micha', 'Oli', 'Tom'])
 
     def test_greater_than_typedecorated_datetime(self):
         datestring = (self.now - timedelta(minutes=1)).isoformat()
-        self.perform_assertion({"name": "l_date", "op": "gt", "val": datestring},
+        self.perform_assertion({"name": "u_date", "op": "gt", "val": datestring},
                           ['Micha', 'Oli', 'Tom'])
         datestring = (self.now + timedelta(minutes=1)).isoformat()
         self.perform_assertion(

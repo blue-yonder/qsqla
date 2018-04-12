@@ -51,6 +51,7 @@ Binary operators:
 - ``not_ilike`` always case-insensitive not like for String fields
 - ``in`` for Integer, String fields. The values are provided as a comma separated list.
 - ``not_in`` for Integer, String fields. The values are provided as a comma separated list.
+- ``with`` for relationships. Combine any other binary operator with an additional `__` on any relationship
 
 Supported Types:
 
@@ -87,6 +88,17 @@ def requires_types(*types):
     return dec
 
 
+def requires_mapped_attribute(f):
+    @functools.wraps(f)
+    def wrapper(arg1, arg2=None):
+        try:
+            getattr(arg1.property, 'mapper')
+        except:
+            raise TypeError("{} is not a mapped attribute".format(arg1))
+        return f(arg1, arg2)
+    return wrapper
+
+
 def convert_type(type_, value):
     cls = type_.__class__
     basetype = getattr(cls, 'impl', cls)
@@ -96,6 +108,15 @@ def convert_type(type_, value):
         return value
     elif issubclass(basetype, sqlalchemy.types.DateTime):
         return dateutil.parser.parse(value)
+
+
+def get_subquery(arg1, arg2):
+    if "=" not in arg2:
+        raise KeyError("`any` expects a second operator added with `__`")
+    subquery = split_operator(arg2)
+    subquery_column = getattr(arg1.property.mapper.class_, subquery[0])
+    subquery_op_val = subquery[1].rsplit("=", 1)
+    return subquery_column, subquery_op_val
 
 
 def convert_generic(f):
@@ -148,6 +169,7 @@ def not_equals(arg1, arg2):
 @convert_generic
 def ignore_case_equals(arg1, arg2):
     return sqlalchemy.func.lower(arg1) == arg2.lower()
+
 
 @requires_types(sqlalchemy.types.Integer, sqlalchemy.types.DateTime)
 @convert_generic
@@ -209,6 +231,16 @@ def not_in(arg1, arg2):
     return ~arg1.in_(arg2)
 
 
+@requires_mapped_attribute
+def with_(arg1, arg2):
+    subquery_column, subquery_op_val = get_subquery(arg1, arg2)
+    if arg1.property.uselist:
+        restriction = arg1.any(OPERATORS[subquery_op_val[0]](subquery_column, subquery_op_val[1]))
+    else:
+        restriction = arg1.has(OPERATORS[subquery_op_val[0]](subquery_column, subquery_op_val[1]))
+    return restriction
+
+
 UNARY_OPERATORS = ['is_null', 'is_not_null', 'is_true', 'is_false']
 
 
@@ -232,6 +264,7 @@ OPERATORS = {
     'not_ilike': not_ilike,
     'in': in_,
     'not_in': not_in,
+    'with': with_
 }
 
 
@@ -242,7 +275,7 @@ def split_operator(param):
         operator = 'eq'
     else:
         name = query[0]
-        operator = query[1].lower()
+        operator = query[1].lower() if (len(query[1]) == 2) else query[1]
     if name == '':
         raise ValueError("No valid parameter provided")
     return (name, operator)
@@ -252,7 +285,13 @@ def build_filters(query):
     """ build filter dictionary from a query dict"""
     filters = []
     for key, val in query.items():
-        name, operator = split_operator(key)
+        if len(key.rsplit('__', 3)) == 4:
+            keys = key.rsplit('__', 3)
+            name = keys[0]
+            operator = keys[1]
+            val = "{}__{}={}".format(keys[2], keys[3], val)
+        else:
+            name, operator = split_operator(key)
         filters.append({"name": name, "op": operator, "val": val})
     return filters
 

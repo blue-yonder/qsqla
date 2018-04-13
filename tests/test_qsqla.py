@@ -291,9 +291,7 @@ class TestOperators(DBTestCase):
             ['Tom'])
 
 
-    @unittest.skip("SQLite issue")
-    # https://www.sqlite.org/pragma.html#pragma_case_sensitive_like
-    # TODO investigate why it only fails on ORM query and not core query
+    # Fails if run with sqlite, see issue https://www.sqlite.org/pragma.html#pragma_case_sensitive_like
     def test_like_is_case_sensitive(self):
         self.perform_assertion(
             {"name": "l_name", "op": "like", "val": "%gaRT%"},
@@ -347,7 +345,7 @@ class TestOperators(DBTestCase):
             [])
 
     def test_with_eq_many_relation(self):
-        q = qsqla.query(User, [{"name": "pets", "op": "with", "val": "p_name__eq=Hooch"}])
+        q = qsqla.query(User, [{"name": "pets", "op": "with", "val": "p_name__eq=Hooch"}], order="u_id", asc=True)
         q.session = self.session
         self.assertEqual([row.u_name for row in q.all()], ['Micha', 'Oli'])
 
@@ -447,7 +445,7 @@ class TestOperators(DBTestCase):
         self.assertEqual([row.u_name for row in q.all()], ['Micha', 'Oli'])
 
     def test_with_like_location_relation(self):
-        q = qsqla.query(User, [{"name": "location", "op": "with", "val": "l_name__like=%uTtg%"}])
+        q = qsqla.query(User, [{"name": "location", "op": "with", "val": "l_name__like=%uttg%"}])
         q.session = self.session
         self.assertEqual([row.u_name for row in q.all()], ['Tom'])
 

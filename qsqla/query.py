@@ -51,7 +51,7 @@ Binary operators:
 - ``not_ilike`` always case-insensitive not like for String fields
 - ``in`` for Integer, String fields. The values are provided as a comma separated list.
 - ``not_in`` for Integer, String fields. The values are provided as a comma separated list.
-- ``with`` for relationships. Combine any other binary operator with an additional `__` on any relationship
+- ``with`` for relationships. Combine any other binary operator with an additional `__` on any relationship. Can only be used on ORM queries.
 
 Supported Types:
 

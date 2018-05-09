@@ -1,10 +1,15 @@
 Next Release
 ============
 
+0.3.0
+=====
+
+- Added `with` operator for n-to-m relationships. This can only be used with the ORM. 
+
 0.2.0
 =====
 
-- Add SQLAlchemy ORM support
+- Added SQLAlchemy ORM support
 
 0.1.2
 =====

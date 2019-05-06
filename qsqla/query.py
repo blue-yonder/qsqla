@@ -303,7 +303,8 @@ def get_column(s, name):
     raise KeyError("column {} not found".format(name))
 
 
-def query(selectable_or_model, filters, limit=None, offset=None, order=None, asc=True):
+def query(selectable_or_model, filters, limit=None, offset=None, order=None,
+          asc=True, upper_bound_limit=10000):
     """
     Main entry point for applying filters and pagination controls.
 
@@ -313,6 +314,7 @@ def query(selectable_or_model, filters, limit=None, offset=None, order=None, asc
     :param offset: int. the offset.
     :param order: string. The name of the field to order by.
     :param asc: bool. Ascending (default) or descending order.
+    :param upper_bound_limit: int. An absolute upper bound limit to use. Disabled if set to None.
 
     :raises KeyError: if key is not available in query
     :raises ValueError: if value cannot be converted to Column Type
@@ -333,12 +335,13 @@ def query(selectable_or_model, filters, limit=None, offset=None, order=None, asc
             order_col = order_col.desc()
         filtered = filtered.order_by(order_col)
 
-    if limit is None:
-        limit = 10000
-    else:
-        limit = min(int(limit), 10000)
+    if limit or upper_bound_limit:
+        if limit is None:
+            limit = upper_bound_limit
+        else:
+            limit = min(int(limit), upper_bound_limit)
+        filtered = filtered.limit(limit)
 
-    filtered = filtered.limit(limit)
     if offset:
         filtered = filtered.offset(offset)
 

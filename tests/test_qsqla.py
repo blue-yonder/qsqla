@@ -164,6 +164,15 @@ class TestSqlaQueryCore(DBTestCase):
         rows = self.db.execute(query)
         self.assertEquals(len(list(rows)), limit)
 
+    def test_upper_bound_limit(self):
+        query = qsqla.query(self.user.select(), [], limit=1, upper_bound_limit=2)
+        rows = self.db.execute(query)
+        self.assertEquals(len(list(rows)), 1)
+
+        query = qsqla.query(self.user.select(), [], limit=500, upper_bound_limit=2)
+        rows = self.db.execute(query)
+        self.assertEquals(len(list(rows)), 2)
+
     def test_offset(self):
         query = qsqla.query(self.user.select(), [], offset=2)
         rows = self.db.execute(query)

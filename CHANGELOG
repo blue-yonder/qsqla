@@ -1,6 +1,9 @@
 Next Release
 ============
 
+0.3.1
+=====
+
 - Added `upper_bound_limit` for specifying (or disabling) the current default upper bound of 10000 rows.
 
 0.3.0

@@ -339,7 +339,10 @@ def query(selectable_or_model, filters, limit=None, offset=None, order=None,
         if limit is None:
             limit = upper_bound_limit
         else:
-            limit = min(int(limit), upper_bound_limit)
+            if upper_bound_limit:
+                limit = min(int(limit), upper_bound_limit)
+            else:
+                limit = int(limit)
         filtered = filtered.limit(limit)
 
     if offset:

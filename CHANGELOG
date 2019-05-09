@@ -1,6 +1,11 @@
 Next Release
 ============
 
+0.3.2
+=====
+
+- Handle case where `limit` is set but `upper_bound_limit` is `None`
+
 0.3.1
 =====
 
